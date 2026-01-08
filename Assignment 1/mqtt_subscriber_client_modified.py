@@ -15,7 +15,7 @@ def on_connect(client, userdata, flags, rc):
         print("connected OK")
     else:
         print("Bad connection Returned code=",rc)
-def on_disconnect(client, userdata, rc):
+def on_disconnect(client, userdata, flags, rc=0):
         print("DisConnected result code "+str(rc))
 def on_message(client,userdata,msg):
         topic=msg.topic
@@ -23,7 +23,7 @@ def on_message(client,userdata,msg):
         print("Message Topic: ", topic)
         print("message received: ", m_decode)
 
-client = mqtt.Client("IOT_sub_22032021_YY44554", clean_session=True, callback_api_version=mqtt.CallbackAPIVersion.VERSION1) # create new client instance
+client = mqtt.Client("IOT_sub_22032021_YY44554", clean_session=True) # create new client instance
 
 client.on_connect=on_connect  #bind call back function
 client.on_disconnect=on_disconnect
