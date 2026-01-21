@@ -155,26 +155,35 @@ class DataManagerApp(QMainWindow):
         # Main widget
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
-        layout = QVBoxLayout()
+        main_layout = QVBoxLayout(main_widget)
+        
+        # Create Tab Widget
+        self.tabs = QTabWidget()
+        main_layout.addWidget(self.tabs)
+        
+        # Create Control Panel Tab
+        self.control_tab = QWidget()
+        self.tabs.addTab(self.control_tab, "Control Panel")
+        control_layout = QVBoxLayout(self.control_tab)
+        
+        # Create Database Viewer Tab
+        self.db_viewer_tab = QWidget()
+        self.tabs.addTab(self.db_viewer_tab, "Database Viewer")
+        db_viewer_layout = QVBoxLayout(self.db_viewer_tab)
+
+        # --- Populate Control Panel Tab ---
         
         # Connection section
         connection_group = QGroupBox("MQTT Connection")
         connection_layout = QFormLayout()
-        
-        self.broker_input = QLineEdit()
-        self.broker_input.setText(BROKER_IP)
-        
-        self.port_input = QLineEdit()
-        self.port_input.setText(str(BROKER_PORT))
+        self.broker_input = QLineEdit(BROKER_IP)
+        self.port_input = QLineEdit(str(BROKER_PORT))
         self.port_input.setValidator(QIntValidator(1, 65535))
-        
         self.connect_btn = QPushButton("Start Data Collection")
         self.connect_btn.clicked.connect(self.toggle_connection)
         self.connect_btn.setStyleSheet("background-color: #ff6b6b; color: white; font-size: 14px; padding: 5px;")
-        
         self.status_label = QLabel("Status: Disconnected")
         self.status_label.setStyleSheet("font-size: 12px;")
-        
         connection_layout.addRow("Broker IP:", self.broker_input)
         connection_layout.addRow("Port:", self.port_input)
         connection_layout.addRow("", self.connect_btn)
@@ -184,16 +193,12 @@ class DataManagerApp(QMainWindow):
         # Statistics section
         stats_group = QGroupBox("Statistics")
         stats_layout = QGridLayout()
-        
         self.data_count_label = QLabel("Data Records: 0")
         self.data_count_label.setStyleSheet("font-size: 14px; font-weight: bold;")
-        
         self.warning_count_label = QLabel("Warnings: 0")
         self.warning_count_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #f39c12;")
-        
         self.alarm_count_label = QLabel("Alarms: 0")
         self.alarm_count_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #e74c3c;")
-        
         stats_layout.addWidget(self.data_count_label, 0, 0)
         stats_layout.addWidget(self.warning_count_label, 0, 1)
         stats_layout.addWidget(self.alarm_count_label, 0, 2)
@@ -202,17 +207,14 @@ class DataManagerApp(QMainWindow):
         # Thresholds section
         thresholds_group = QGroupBox("Alert Thresholds")
         thresholds_layout = QFormLayout()
-        
         self.temp_low_alarm = QLineEdit(str(self.temp_alarm_low))
         self.temp_low_warning = QLineEdit(str(self.temp_warning_low))
         self.temp_high_warning = QLineEdit(str(self.temp_warning_high))
         self.temp_high_alarm = QLineEdit(str(self.temp_alarm_high))
-        
         self.hum_low_alarm = QLineEdit(str(self.humidity_alarm_low))
         self.hum_low_warning = QLineEdit(str(self.humidity_warning_low))
         self.hum_high_warning = QLineEdit(str(self.humidity_warning_high))
         self.hum_high_alarm = QLineEdit(str(self.humidity_alarm_high))
-        
         thresholds_layout.addRow("Temp Alarm Low:", self.temp_low_alarm)
         thresholds_layout.addRow("Temp Warning Low:", self.temp_low_warning)
         thresholds_layout.addRow("Temp Warning High:", self.temp_high_warning)
@@ -221,7 +223,6 @@ class DataManagerApp(QMainWindow):
         thresholds_layout.addRow("Humidity Warning Low:", self.hum_low_warning)
         thresholds_layout.addRow("Humidity Warning High:", self.hum_high_warning)
         thresholds_layout.addRow("Humidity Alarm High:", self.hum_high_alarm)
-        
         update_thresholds_btn = QPushButton("Update Thresholds")
         update_thresholds_btn.clicked.connect(self.update_thresholds)
         thresholds_layout.addRow("", update_thresholds_btn)
@@ -230,26 +231,70 @@ class DataManagerApp(QMainWindow):
         # Activity log
         log_group = QGroupBox("Activity Log")
         log_layout = QVBoxLayout()
-        
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setMaximumHeight(200)
-        
         clear_log_btn = QPushButton("Clear Log")
         clear_log_btn.clicked.connect(self.log_text.clear)
-        
         log_layout.addWidget(self.log_text)
         log_layout.addWidget(clear_log_btn)
         log_group.setLayout(log_layout)
         
-        # Assemble layout
-        layout.addWidget(connection_group)
-        layout.addWidget(stats_group)
-        layout.addWidget(thresholds_group)
-        layout.addWidget(log_group)
-        layout.addStretch()
-        main_widget.setLayout(layout)
-    
+        # Assemble Control Panel layout
+        control_layout.addWidget(connection_group)
+        control_layout.addWidget(stats_group)
+        control_layout.addWidget(thresholds_group)
+        control_layout.addWidget(log_group)
+        control_layout.addStretch()
+
+        # --- Populate Database Viewer Tab ---
+        
+        # Top layout for controls
+        db_controls_layout = QHBoxLayout()
+        self.db_table_selector = QComboBox()
+        self.db_table_selector.addItems(self.db_manager.get_table_names())
+        
+        db_load_btn = QPushButton("Load Table")
+        db_load_btn.clicked.connect(self.load_table_data)
+        
+        db_controls_layout.addWidget(QLabel("Select Table:"))
+        db_controls_layout.addWidget(self.db_table_selector)
+        db_controls_layout.addWidget(db_load_btn)
+        db_controls_layout.addStretch()
+        
+        # Table widget for displaying data
+        self.db_table_widget = QTableWidget()
+        self.db_table_widget.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.db_table_widget.setAlternatingRowColors(True)
+        
+        db_viewer_layout.addLayout(db_controls_layout)
+        db_viewer_layout.addWidget(self.db_table_widget)
+
+    def load_table_data(self):
+        """Load data into the database table viewer."""
+        table_name = self.db_table_selector.currentText()
+        if not table_name:
+            return
+
+        try:
+            headers, data = self.db_manager.get_table_content(table_name)
+            
+            self.db_table_widget.clear()
+            self.db_table_widget.setRowCount(len(data))
+            self.db_table_widget.setColumnCount(len(headers))
+            self.db_table_widget.setHorizontalHeaderLabels(headers)
+            
+            for row_idx, row_data in enumerate(data):
+                for col_idx, cell_data in enumerate(row_data):
+                    item = QTableWidgetItem(str(cell_data))
+                    self.db_table_widget.setItem(row_idx, col_idx, item)
+            
+            self.db_table_widget.resizeColumnsToContents()
+            self.log_message(f"Loaded {len(data)} rows from table '{table_name}'")
+        except Exception as e:
+            self.log_message(f"Error loading table '{table_name}': {e}")
+            print(f"Error loading table data: {e}")
+
     def toggle_connection(self):
         """Toggle MQTT connection"""
         if not self.is_active:

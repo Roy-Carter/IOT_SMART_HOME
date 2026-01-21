@@ -41,7 +41,7 @@ class DatabaseManager:
     
     def close_connection(self):
         """Close database connection"""
-        if self.conn:
+        if hasattr(self, 'conn') and self.conn:
             self.conn.close()
             self.conn = None
     
@@ -194,3 +194,44 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error acknowledging alert: {e}")
             return False
+
+    def get_table_names(self):
+        """Get all table names from the database."""
+        try:
+            with self._lock:
+                conn = self.get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+                tables = [row[0] for row in cursor.fetchall()]
+                conn.close()
+            # Filter out sqlite sequence table
+            return [table for table in tables if table != 'sqlite_sequence']
+        except Exception as e:
+            print(f"Error fetching table names: {e}")
+            return []
+
+    def get_table_content(self, table_name):
+        """Get column headers and all rows for a given table."""
+        # Basic security check to prevent SQL injection
+        if not table_name or not table_name.isidentifier():
+            print(f"Invalid table name provided: {table_name}")
+            return [], []
+        
+        try:
+            with self._lock:
+                conn = self.get_connection()
+                cursor = conn.cursor()
+                
+                # Get headers in a safe way
+                cursor.execute(f"PRAGMA table_info('{table_name}');")
+                headers = [row[1] for row in cursor.fetchall()]
+                
+                # Get data using parameterized query for safety, even if just table name
+                cursor.execute(f"SELECT * FROM {table_name} ORDER BY id DESC LIMIT 500;")
+                rows = cursor.fetchall()
+                
+                conn.close()
+            return headers, rows
+        except Exception as e:
+            print(f"Error fetching content for table '{table_name}': {e}")
+            return [], []

@@ -21,14 +21,5 @@ timeout /t 2 /nobreak > nul
 echo Starting Main GUI...
 start "Main GUI Dashboard" python gui/main_gui.py
 
-echo.
 echo All applications started!
-echo.
-echo IMPORTANT:
-echo 1. First, connect all emulators to the MQTT broker
-echo 2. Then start the Data Manager and click "Start Data Collection"
-echo 3. Finally, connect the Main GUI to view real-time data
-echo.
 echo To stop all applications, run: stop_all.bat
-echo.
-pause
