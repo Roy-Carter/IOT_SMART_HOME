@@ -12,8 +12,6 @@ timeout /t 2 /nobreak > nul
 start "AC/Fan Controller" python emulators/relay_actuator.py
 timeout /t 2 /nobreak > nul
 
-timeout /t 3 /nobreak > nul
-
 echo Starting Data Manager...
 start "Data Manager" python data_manager/data_manager.py
 timeout /t 2 /nobreak > nul
