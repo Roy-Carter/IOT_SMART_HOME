@@ -25,8 +25,9 @@ MQTT_PASSWORD = PASSWORDS[BROKER_SELECTION]
 TOPIC_NAMESPACE = 'smart_office'
 TOPICS = {
     'dht_sensor': f'{TOPIC_NAMESPACE}/sensors/dht',
-    'button_actuator': f'{TOPIC_NAMESPACE}/actuators/button',
-    'relay_actuator': f'{TOPIC_NAMESPACE}/actuators/relay',
+    'occupancy_sensor': f'{TOPIC_NAMESPACE}/sensors/occupancy',
+    'ac_controller': f'{TOPIC_NAMESPACE}/actuators/ac',
+    'ac_controller_control': f'{TOPIC_NAMESPACE}/actuators/ac/control',
     'warnings': f'{TOPIC_NAMESPACE}/alerts/warnings',
     'alarms': f'{TOPIC_NAMESPACE}/alerts/alarms',
     'data_manager': f'{TOPIC_NAMESPACE}/manager/status',

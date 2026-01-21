@@ -98,8 +98,8 @@ class MainGUIApp(QMainWindow):
         # Current data
         self.current_temp = None
         self.current_humidity = None
-        self.button_state = "Unknown"
-        self.relay_state = "Unknown"
+        self.occupancy_state = "Unknown"
+        self.ac_state = "Unknown"
         
         # Alerts
         self.warnings = []
@@ -110,7 +110,7 @@ class MainGUIApp(QMainWindow):
         # Timer for refreshing data from database
         self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.refresh_from_database)
-        self.refresh_timer.start(3000)  # Refresh every 3 seconds
+        self.refresh_timer.start(2000)  # Refresh every 2 seconds for better sync
     
     def init_ui(self):
         """Initialize user interface"""
@@ -185,17 +185,17 @@ class MainGUIApp(QMainWindow):
         sensor_group.setLayout(sensor_layout)
         
         # Actuator status section
-        actuator_group = QGroupBox("Actuator Status")
+        actuator_group = QGroupBox("Device Status")
         actuator_layout = QFormLayout()
         
-        self.button_status_label = QLabel("Unknown")
-        self.button_status_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        self.occupancy_status_label = QLabel("Unknown")
+        self.occupancy_status_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         
-        self.relay_status_label = QLabel("Unknown")
-        self.relay_status_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        self.ac_status_label = QLabel("Unknown")
+        self.ac_status_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         
-        actuator_layout.addRow("Button State:", self.button_status_label)
-        actuator_layout.addRow("Relay State:", self.relay_status_label)
+        actuator_layout.addRow("Office Occupancy:", self.occupancy_status_label)
+        actuator_layout.addRow("AC Status:", self.ac_status_label)
         actuator_group.setLayout(actuator_layout)
         
         # Left panel layout
@@ -319,41 +319,41 @@ class MainGUIApp(QMainWindow):
                 
                 self.add_info(f"Updated: {device_type} - Temp: {self.current_temp}°C, Humidity: {self.current_humidity}%")
             
-            # Handle button actuator
-            elif 'Button_Actuator' in device_type:
-                self.button_state = payload.get('state', 'Unknown')
-                state_color = "#2ecc71" if self.button_state == "ON" else "#95a5a6"
-                self.button_status_label.setText(self.button_state)
-                self.button_status_label.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {state_color};")
-                self.add_info(f"Button state changed: {self.button_state}")
+            # Handle occupancy sensor
+            elif 'Occupancy_Sensor' in device_type:
+                occupancy_value = payload.get('occupancy', '')
+                state_value = payload.get('state', 'Unknown')
+                # Use occupancy field if available, otherwise use state
+                if occupancy_value:
+                    self.occupancy_state = occupancy_value
+                    state_color = "#2ecc71" if occupancy_value == "Occupied" else "#95a5a6"
+                    display_text = occupancy_value
+                else:
+                    self.occupancy_state = "Occupied" if state_value == "ON" else "Vacant"
+                    state_color = "#2ecc71" if state_value == "ON" else "#95a5a6"
+                    display_text = self.occupancy_state
+                self.occupancy_status_label.setText(display_text)
+                self.occupancy_status_label.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {state_color};")
+                self.add_info(f"Office occupancy changed: {display_text}")
             
-            # Handle relay actuator
-            elif 'Relay_Actuator' in device_type:
-                self.relay_state = payload.get('state', 'Unknown')
-                state_color = "#2ecc71" if self.relay_state == "ON" else "#e74c3c"
-                self.relay_status_label.setText(self.relay_state)
-                self.relay_status_label.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {state_color};")
-                self.add_info(f"Relay state changed: {self.relay_state}")
+            # Handle AC controller
+            elif 'AC_Controller' in device_type:
+                self.ac_state = payload.get('state', 'Unknown')
+                state_color = "#2ecc71" if self.ac_state == "ON" else "#e74c3c"
+                display_text = f"AC {self.ac_state}"
+                self.ac_status_label.setText(display_text)
+                self.ac_status_label.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {state_color};")
+                self.add_info(f"AC status changed: {display_text}")
             
-            # Handle warnings
+            # Handle warnings - trigger immediate refresh from database for accurate count
             elif 'warnings' in topic or payload.get('severity') == 'warning':
-                message = payload.get('message', str(payload))
-                timestamp = payload.get('timestamp', datetime.now().isoformat())
-                warning_msg = f"[{timestamp}] {message}"
-                self.warnings.append(warning_msg)
-                # Use QTimer.singleShot to ensure UI updates happen in main thread
-                QTimer.singleShot(0, lambda: self.warning_text.append(warning_msg))
-                QTimer.singleShot(0, lambda: self.alert_tabs.setTabText(1, f"Warnings ({len(self.warnings)})"))
+                # Trigger immediate DB refresh to get accurate count and display
+                QTimer.singleShot(100, self.refresh_from_database)
             
-            # Handle alarms
+            # Handle alarms - trigger immediate refresh from database for accurate count
             elif 'alarms' in topic or payload.get('severity') == 'alarm':
-                message = payload.get('message', str(payload))
-                timestamp = payload.get('timestamp', datetime.now().isoformat())
-                alarm_msg = f"[{timestamp}] {message}"
-                self.alarms.append(alarm_msg)
-                # Use QTimer.singleShot to ensure UI updates happen in main thread
-                QTimer.singleShot(0, lambda: self.alarm_text.append(alarm_msg))
-                QTimer.singleShot(0, lambda: self.alert_tabs.setTabText(2, f"Alarms ({len(self.alarms)})"))
+                # Trigger immediate DB refresh to get accurate count and display
+                QTimer.singleShot(100, self.refresh_from_database)
             
             self.last_update_label.setText(datetime.now().strftime('%H:%M:%S'))
             
@@ -376,26 +376,34 @@ class MainGUIApp(QMainWindow):
                     self.current_humidity = row[6]
                     self.humidity_label.setText(f"{self.current_humidity}%")
             
-            # Get recent alerts
-            recent_warnings = self.db_manager.get_recent_alerts(limit=10, severity='warning', acknowledged=0)
-            recent_alarms = self.db_manager.get_recent_alerts(limit=10, severity='alarm', acknowledged=0)
+            # Get ALL unacknowledged alerts (no limit) to get accurate count
+            all_warnings = self.db_manager.get_recent_alerts(limit=1000, severity='warning', acknowledged=0)
+            all_alarms = self.db_manager.get_recent_alerts(limit=1000, severity='alarm', acknowledged=0)
             
-            # Update warnings
-            if len(recent_warnings) != len(self.warnings):
+            # Get recent alerts for display (last 50)
+            recent_warnings = all_warnings[:50] if len(all_warnings) > 50 else all_warnings
+            recent_alarms = all_alarms[:50] if len(all_alarms) > 50 else all_alarms
+            
+            # Update warnings - use total count from database
+            total_warning_count = len(all_warnings)
+            if total_warning_count != len(self.warnings) or True:  # Always refresh from DB
                 self.warning_text.clear()
                 for alert in recent_warnings:
                     # Format: (id, timestamp, alert_type, severity, device_type, device_id, topic, message, value, threshold, acknowledged, created_at)
                     msg = f"[{alert[1]}] {alert[7]}"
                     self.warning_text.append(msg)
-                self.alert_tabs.setTabText(1, f"Warnings ({len(recent_warnings)})")
+                self.warnings = [f"[{a[1]}] {a[7]}" for a in all_warnings]  # Sync list with DB
+                self.alert_tabs.setTabText(1, f"Warnings ({total_warning_count})")
             
-            # Update alarms
-            if len(recent_alarms) != len(self.alarms):
+            # Update alarms - use total count from database
+            total_alarm_count = len(all_alarms)
+            if total_alarm_count != len(self.alarms) or True:  # Always refresh from DB
                 self.alarm_text.clear()
                 for alert in recent_alarms:
                     msg = f"[{alert[1]}] {alert[7]}"
                     self.alarm_text.append(msg)
-                self.alert_tabs.setTabText(2, f"Alarms ({len(recent_alarms)})")
+                self.alarms = [f"[{a[1]}] {a[7]}" for a in all_alarms]  # Sync list with DB
+                self.alert_tabs.setTabText(2, f"Alarms ({total_alarm_count})")
             
         except Exception as e:
             print(f"[MainGUI] Error refreshing from database: {e}")

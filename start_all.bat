@@ -6,10 +6,10 @@ echo Starting Emulators...
 start "Temperature & Humidity Sensor" python emulators/temperature_humidity_sensor.py
 timeout /t 2 /nobreak > nul
 
-start "Button Actuator" python emulators/button_actuator.py
+start "Occupancy Sensor" python emulators/button_actuator.py
 timeout /t 2 /nobreak > nul
 
-start "Relay Actuator" python emulators/relay_actuator.py
+start "AC/Fan Controller" python emulators/relay_actuator.py
 timeout /t 2 /nobreak > nul
 
 timeout /t 3 /nobreak > nul
@@ -28,5 +28,7 @@ echo IMPORTANT:
 echo 1. First, connect all emulators to the MQTT broker
 echo 2. Then start the Data Manager and click "Start Data Collection"
 echo 3. Finally, connect the Main GUI to view real-time data
+echo.
+echo To stop all applications, run: stop_all.bat
 echo.
 pause

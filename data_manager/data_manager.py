@@ -140,6 +140,11 @@ class DataManagerApp(QMainWindow):
         self.humidity_alarm_low = 25.0
         self.humidity_alarm_high = 85.0
         
+        # State tracking for automatic AC control
+        self.current_temperature = None
+        self.current_occupancy = False  # False = Vacant, True = Occupied
+        self.last_ac_command = None  # Track last AC command to avoid duplicates
+        
         self.init_ui()
     
     def init_ui(self):
@@ -294,6 +299,12 @@ class DataManagerApp(QMainWindow):
                 self.data_count += 1
                 self.update_statistics()
                 
+                # Track current temperature for automatic AC control
+                if temp is not None:
+                    self.current_temperature = temp
+                    # Trigger automatic AC control check after temperature update
+                    self.check_and_control_ac()
+                
                 # Process alerts for temperature
                 if temp is not None:
                     if temp <= self.temp_alarm_low or temp >= self.temp_alarm_high:
@@ -381,9 +392,75 @@ class DataManagerApp(QMainWindow):
                 self.update_statistics()
                 self.log_message(f"Actuator data stored: {device_type} - {action} ({state})")
             
+            # Track occupancy state for automatic AC control
+            elif 'Occupancy_Sensor' in device_type:
+                occupancy_value = payload.get('occupancy', '')
+                state_value = payload.get('state', 'OFF')
+                self.current_occupancy = (state_value == 'ON' or occupancy_value == 'Occupied')
+                self.log_message(f"Occupancy updated: {'Occupied' if self.current_occupancy else 'Vacant'}")
+                # Trigger automatic AC control check
+                self.check_and_control_ac()
+            
+            # Track AC controller state (but don't control it from here to avoid loops)
+            elif 'AC_Controller' in device_type:
+                state_value = payload.get('state', 'OFF')
+                self.log_message(f"AC Controller state updated: {state_value}")
+            
         except Exception as e:
             self.log_message(f"Error processing message: {e}")
             print(f"[DataManager] Error handling message: {e}")
+    
+    def check_and_control_ac(self):
+        """Automatic AC control based on temperature and occupancy"""
+        if not self.is_active or not self.mqtt_client or not self.mqtt_client.connected:
+            return
+        
+        if self.current_temperature is None:
+            return  # Need temperature reading first
+        
+        # Automatic AC control logic
+        should_ac_be_on = False
+        reason = ""
+        
+        # Rule 1: If office is vacant, turn AC OFF (energy saving)
+        if not self.current_occupancy:
+            should_ac_be_on = False
+            reason = "Office is vacant - AC turned OFF for energy saving"
+        # Rule 2: If temperature > warning high AND office is occupied, turn AC ON
+        elif self.current_temperature > self.temp_warning_high:
+            should_ac_be_on = True
+            reason = f"Temperature {self.current_temperature}°C is high and office is occupied - AC turned ON"
+        # Rule 3: If temperature < warning low AND AC was ON, can turn OFF
+        elif self.current_temperature < self.temp_warning_low:
+            should_ac_be_on = False
+            reason = f"Temperature {self.current_temperature}°C is comfortable - AC turned OFF"
+        
+        # Only send command if it's different from last command
+        if should_ac_be_on != self.last_ac_command:
+            self.send_ac_control_command(should_ac_be_on, reason)
+            self.last_ac_command = should_ac_be_on
+    
+    def send_ac_control_command(self, turn_on, reason):
+        """Send AC control command via MQTT"""
+        try:
+            command = "turn_on" if turn_on else "turn_off"
+            payload = {
+                "command": command,
+                "reason": reason,
+                "timestamp": datetime.now().isoformat(),
+                "temperature": self.current_temperature,
+                "occupancy": "Occupied" if self.current_occupancy else "Vacant"
+            }
+            
+            self.mqtt_client.client.publish(
+                TOPICS['ac_controller_control'], 
+                json.dumps(payload), 
+                qos=1
+            )
+            self.log_message(f"Auto AC Control: {reason}")
+            print(f"[DataManager] AC Control: {reason}")
+        except Exception as e:
+            print(f"[DataManager] Error sending AC command: {e}")
     
     def update_thresholds(self):
         """Update alert thresholds"""
