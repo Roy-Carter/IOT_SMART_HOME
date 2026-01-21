@@ -219,8 +219,7 @@ class MainGUIApp(QMainWindow):
         # Info tab
         self.info_tab = QWidget()
         info_layout = QVBoxLayout()
-        self.info_text = QTextEdit()
-        self.info_text.setReadOnly(True)
+        self.info_text = QListWidget()
         info_layout.addWidget(self.info_text)
         self.info_tab.setLayout(info_layout)
         self.alert_tabs.addTab(self.info_tab, "Info")
@@ -228,9 +227,7 @@ class MainGUIApp(QMainWindow):
         # Warnings tab
         self.warning_tab = QWidget()
         warning_layout = QVBoxLayout()
-        self.warning_text = QTextEdit()
-        self.warning_text.setReadOnly(True)
-        self.warning_text.setStyleSheet("background-color: #fff3cd;")
+        self.warning_text = QListWidget()
         warning_layout.addWidget(self.warning_text)
         self.warning_tab.setLayout(warning_layout)
         self.alert_tabs.addTab(self.warning_tab, "Warnings")
@@ -238,9 +235,7 @@ class MainGUIApp(QMainWindow):
         # Alarms tab
         self.alarm_tab = QWidget()
         alarm_layout = QVBoxLayout()
-        self.alarm_text = QTextEdit()
-        self.alarm_text.setReadOnly(True)
-        self.alarm_text.setStyleSheet("background-color: #f8d7da;")
+        self.alarm_text = QListWidget()
         alarm_layout.addWidget(self.alarm_text)
         self.alarm_tab.setLayout(alarm_layout)
         self.alert_tabs.addTab(self.alarm_tab, "Alarms")
@@ -391,20 +386,28 @@ class MainGUIApp(QMainWindow):
                 for alert in recent_warnings:
                     # Format: (id, timestamp, alert_type, severity, device_type, device_id, topic, message, value, threshold, acknowledged, created_at)
                     msg = f"[{alert[1]}] {alert[7]}"
-                    self.warning_text.append(msg)
+                    item = QListWidgetItem(msg)
+                    item.setBackground(QColor("#fff3cd"))  # Yellow
+                    self.warning_text.addItem(item)
                 self.warnings = [f"[{a[1]}] {a[7]}" for a in all_warnings]  # Sync list with DB
                 self.alert_tabs.setTabText(1, f"Warnings ({total_warning_count})")
-            
+                if recent_warnings:
+                    self.warning_text.scrollToBottom()
+
             # Update alarms - use total count from database
             total_alarm_count = len(all_alarms)
             if total_alarm_count != len(self.alarms) or True:  # Always refresh from DB
                 self.alarm_text.clear()
                 for alert in recent_alarms:
                     msg = f"[{alert[1]}] {alert[7]}"
-                    self.alarm_text.append(msg)
+                    item = QListWidgetItem(msg)
+                    item.setBackground(QColor("#f8d7da"))  # Red
+                    self.alarm_text.addItem(item)
                 self.alarms = [f"[{a[1]}] {a[7]}" for a in all_alarms]  # Sync list with DB
                 self.alert_tabs.setTabText(2, f"Alarms ({total_alarm_count})")
-            
+                if recent_alarms:
+                    self.alarm_text.scrollToBottom()
+
         except Exception as e:
             print(f"[MainGUI] Error refreshing from database: {e}")
     
@@ -415,9 +418,10 @@ class MainGUIApp(QMainWindow):
     def add_info_thread_safe(self, message):
         """Thread-safe method to add info message"""
         timestamp = datetime.now().strftime('%H:%M:%S')
-        self.info_text.append(f"[{timestamp}] {message}")
-        scrollbar = self.info_text.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+        item = QListWidgetItem(f"[{timestamp}] {message}")
+        item.setBackground(QColor("#d4edda"))  # Green
+        self.info_text.addItem(item)
+        self.info_text.scrollToBottom()
     
     def closeEvent(self, event):
         """Cleanup on window close"""
